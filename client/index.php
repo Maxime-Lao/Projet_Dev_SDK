@@ -42,6 +42,16 @@ function login()
         'state' => bin2hex(random_bytes(16))
     ));
     echo "<a href=\"https://id.twitch.tv/oauth2/authorize?{$queryParams}\">Se connecter via Twitch</a><br/>";
+
+    $queryParams = http_build_query(array(
+        'client_id' => DISCORD_CLIENT_ID,
+        'client_secret' => DISCORD_SECRET_ID,
+        'redirect_uri' => 'http://localhost:8081/discord_callback',
+        'grant_type' => 'authorization_code',
+        'response_type' => 'code',
+        'scope' => 'identify guilds'
+    ));
+    echo "<a href=\"https://discord.com/api/oauth2/authorize?{$queryParams}\">Se connecter via Discord</a><br/>";
 }
 
 function callback()
@@ -182,6 +192,46 @@ function twcallback()
 	var_dump($response);
 }
 
+function discordcallback()
+{
+    $specifParams = [
+        "grant_type" => "authorization_code",
+        "code" => $_GET["code"],
+    ];
+    $data = http_build_query(array_merge([
+        "redirect_uri" => "http://localhost:8081/discord_callback",
+        "client_id" => "996149499997196419",
+        "client_secret" => "auHdg-jqMRRWqjlhHzVOTiwzRuGSsMfu"
+    ], $specifParams));
+
+    $url = "https://discord.com/api/oauth2/token?{$data}";
+    $options = array(
+        'http' => array(
+            'method' => 'POST',
+            'header' => 'Content-Type: application/x-www-form-urlencoded',
+            'content' => $data
+        )
+    );
+    $context = stream_context_create($options);
+    $result = file_get_contents($url, false, $context);
+    $result = json_decode($result, true);
+    $accessToken = $result['access_token'];
+
+    $url = "https://discord.com/api/users/@me";
+    $options = array(
+        'http' => array(
+            'method' => 'GET',
+            'header' => 'Authorization: Bearer ' . $accessToken
+        )
+    );
+
+    $context = stream_context_create($options);
+    $result = file_get_contents($url, false, $context);
+    $result = json_decode($result, true);
+
+    echo "Hello {$result['username']}";
+}
+
 $route = $_SERVER['REQUEST_URI'];
 switch (strtok($route, "?")) {
     case '/login':
@@ -199,6 +249,9 @@ switch (strtok($route, "?")) {
     case '/twitch_callback':
 		twcallback();
 		break;
+    case '/discord_callback':
+        discordcallback();
+        break;
     default:
         echo '404';
         break;
