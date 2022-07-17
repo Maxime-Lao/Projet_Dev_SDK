@@ -1,5 +1,5 @@
 <?php
-
+include "config.php";
 function login()
 {
     $queryParams= http_build_query(array(
@@ -18,13 +18,30 @@ function login()
     ";
     echo "<a href=\"http://localhost:8080/auth?{$queryParams}\">Se connecter via Oauth Server</a><br/>";
     $queryParams= http_build_query(array(
-        "client_id" => "1010755216459252",
+        "client_id" => "549841336609296",
         "redirect_uri" => "http://localhost:8081/fb_callback",
         "response_type" => "code",
         "scope" => "public_profile,email",
         "state" => bin2hex(random_bytes(16))
     ));
-    echo "<a href=\"https://www.facebook.com/v2.10/dialog/oauth?{$queryParams}\">Se connecter via Facebook</a>";
+    echo "<a href=\"https://www.facebook.com/v2.10/dialog/oauth?{$queryParams}\">Se connecter via Facebook</a><br/>";
+
+    $queryParams = http_build_query(array(
+        'client_id' => "5df202db162e7161bca0",
+        'redirect_uri' => "http://localhost:8081/github_callback",
+        'scope' => 'user',
+        'state' => bin2hex(random_bytes(16))
+    ));
+    echo "<a href=\"https://github.com/login/oauth/authorize?{$queryParams}\">Se connecter via GitHub</a><br/>";
+
+    $queryParams = http_build_query(array(
+        'client_id' => 'v1wxh71l9qpy9e50meyi0wqjwy0dqf',
+        'redirect_uri' => 'http://localhost:8081/twitch_callback',
+        'response_type' => 'code',
+        'scope' => 'user:read:email',
+        'state' => bin2hex(random_bytes(16))
+    ));
+    echo "<a href=\"https://id.twitch.tv/oauth2/authorize?{$queryParams}\">Se connecter via Twitch</a><br/>";
 }
 
 function callback()
@@ -73,8 +90,8 @@ function fbcallback()
             "grant_type" => "authorization_code",
             "code" => $_GET["code"],
         ];
-    $clientId = "1010755216459252";
-    $clientSecret = "b0c27b63308d46ae5d236d2bd691921b";
+    $clientId = "549841336609296";
+    $clientSecret = "2455ad594e6fe2814c12cbec62bc59d6";
     $redirectUri = "http://localhost:8081/fb_callback";
     $data = http_build_query(array_merge([
         "redirect_uri" => $redirectUri,
@@ -99,6 +116,72 @@ function fbcallback()
     echo "Hello {$result['name']}";
 }
 
+function githubcallback()
+{
+    $client_id = '5df202db162e7161bca0';
+    $client_secret = '26114803077b65b8d929093c8fc36741fd1fc3f1';
+    $redirect_uri= "http://localhost:8081/github_callback";
+    $authorization_code = $_GET['code'];
+
+    if(!$authorization_code){
+        die('something went wrong!');
+    }
+
+    $url = 'https://github.com/login/oauth/access_token';
+    $data = array(
+        'client_id' => $client_id,
+        'client_secret' => $client_secret,
+        'redirect_uri' => $redirect_uri,
+        'code' => $authorization_code
+    );
+
+    $options = array(
+        'http' => array(
+            'header'  => "Content-type: application/json\r\n",
+            'method'  => 'POST',
+            'content' => json_encode($data)
+        )
+    );
+    $context  = stream_context_create($options);
+    $result = file_get_contents($url, false, $context);
+    var_dump($result);
+}
+
+function twcallback()
+{
+	$specifParams = [
+		'client_id' => 'v1wxh71l9qpy9e50meyi0wqjwy0dqf',
+		'client_secret' => 'zbp7i8rqr5vtjigjhgz43evm9e922b',
+		"code" => $_GET["code"],
+		'grant_type' => 'authorization_code',
+		'redirect_uri' => 'http://localhost:8081/twitch_callback',
+	];
+
+    $data = http_build_query($specifParams);
+
+    $url = "https://id.twitch.tv/oauth2/token?{$data}";
+	$context = stream_context_create([
+		'http' => [
+			'header' => "Content-Type: application/x-www-form-urlencoded",
+			'method' => "POST",
+			'content' => $data
+		]
+	]);
+
+	$result = file_get_contents($url, false, $context);
+	$token = json_decode($result, true);
+
+	$context = stream_context_create([
+		'http' => [
+			'header' => "Authorization: Bearer {$token['access_token']}\r\nClient-Id: v1wxh71l9qpy9e50meyi0wqjwy0dqf",
+		]
+	]);
+
+	$response = file_get_contents("https://api.twitch.tv/helix/users", false, $context);
+
+	var_dump($response);
+}
+
 $route = $_SERVER['REQUEST_URI'];
 switch (strtok($route, "?")) {
     case '/login':
@@ -110,6 +193,12 @@ switch (strtok($route, "?")) {
     case '/fb_callback':
         fbcallback();
         break;
+    case '/github_callback':
+        githubcallback();
+        break;
+    case '/twitch_callback':
+		twcallback();
+		break;
     default:
         echo '404';
         break;

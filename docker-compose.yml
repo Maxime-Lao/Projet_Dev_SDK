@@ -1,3 +1,4 @@
+version: "2"
 services:
   oauth-server:
     image: php:alpine
